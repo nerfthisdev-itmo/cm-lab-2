@@ -84,15 +84,7 @@ systems = [
 ]
 
 
-def find_tau(df, a, b):
-    n = 1000
-    xs = [a + (b - a) * i / n for i in range(n + 1)]
-    dfs = [abs(df(x)) for x in xs]
-    m = min(dfs)
-    M = max(dfs)
-    if m == 0:
-        raise ValueError("На интервале производная равна 0 — метод не сойдётся")
-    return 2 / (m + M)
+
 
 
 
@@ -103,7 +95,7 @@ def chord_method(f, a, b, eps, max_iter=1000):
     x_prev = a
     for _ in range(max_iter):
         x_new = x_prev - f(x_prev) * (b - x_prev) / (f(b) - f(x_prev))
-        if abs(x_new - x_prev) < eps:
+        if abs(x_new - x_prev) < eps and abs(f(x_new)) <= eps:
             return x_new, iter_count + 1, None
         iter_count += 1
         x_prev = x_new
@@ -120,24 +112,24 @@ def newton_method(f, df, x0, eps, max_iter=1000):
         if dfx == 0:
             return None, iter_count, "Производная равна нулю"
         x_new = x_prev - fx / dfx
-        if abs(x_new - x_prev) < eps:
-            return x_new, iter_count + 1, None
+        
         iter_count += 1
         x_prev = x_new
     return x_prev, iter_count, "Достигнуто максимальное количество итераций"
 
-def simple_iteration_method(phi, dphi, a, b, eps, max_iter=1000):
+def simple_iteration_method(f, phi, dphi, a, b, eps, max_iter=1000):
     # Проверка условия сходимости |phi'(x)| < 1
     x_samples = [a + (b - a) * i / 1000 for i in range(1001)]
     if max(abs(dphi(x)) for x in x_samples) >= 1:
         return None, 0, "Условие сходимости не выполнено"
     
     # Выбор начального приближения
-    x_prev = (a + b) / 2  # Можно оптимизировать выбор
+    x_prev = (a + b) / 2  
     iter_count = 0
+    print(f'Фи ({a}){dphi(a)}, Фи ({b}) {dphi(b)}')
     for _ in range(max_iter):
         x_new = phi(x_prev)
-        if abs(x_new - x_prev) < eps:
+        if abs(x_new - x_prev) < eps and abs(f(x_new)) < eps :
             return x_new, iter_count + 1, None
         iter_count += 1
         x_prev = x_new
@@ -221,14 +213,16 @@ def main():
         if method == '1':
             root, iters, error = chord_method(eq['f'], a, b, eps)
         elif method == '2':
-            x0 = a if abs(eq['f'](a)) < abs(eq['f'](b)) else b
+            x0 = a if abs(eq['f'](a) * eq['d2f'](a)) < abs(eq['f'](b) * eq['d2f'](b)) else b
             root, iters, error = newton_method(eq['f'], eq['df'], x0, eps)
         elif method == '3':
             # Преобразование к виду x = phi(x)
-            tau = find_tau(eq['df'], a, b)
-            phi = lambda x: x - tau * eq['f'](x)
-            dphi = lambda x: 1 - tau * eq['df'](x)
-            root, iters, error = simple_iteration_method(phi, dphi, a, b, eps)
+            lambda_value = -1 / max(abs(eq['df'](a)), abs(eq['df'](b)))
+            if eq['df'](a) < 0 and eq['df'](b) < 0:
+                lambda_value = 1 / max(abs(eq['df'](a)), abs(eq['df'](b)))
+            phi = lambda x: x + lambda_value * eq['f'](x)
+            dphi = lambda x: 1 + lambda_value * eq['df'](x)
+            root, iters, error = simple_iteration_method(eq['f'], phi, dphi, a, b, eps)
         else:
             print("Неверный метод")
             return
