@@ -96,21 +96,32 @@ def has_single_root(f, a, b, num_points=100):
 
 
 
-def chord_method(f, a, b, eps, max_iter=1000):
+def chord_method(f, d2f, a, b, eps, max_iter=1000):
     if not has_single_root(f, a, b):
         return None, 0, "На интервале возможно более одного корня"
-
-
     if f(a) * f(b) >= 0:
         return None, 0, "Интервал не содержит корня или содержит несколько корней"
+
+    # Определяем фиксированный конец по знаку второй производной
+    if f(a) * d2f(a) > 0:
+        fixed = a
+        x0 = b
+        def next_x(xi): return xi - (fixed - xi) / (f(fixed) - f(xi)) * f(xi)
+    else:
+        fixed = b
+        x0 = a
+        def next_x(xi): return xi - (fixed - xi) / (f(fixed) - f(xi)) * f(xi)
+
     iter_count = 0
-    x_prev = a
+    x_prev = x0
+
     for _ in range(max_iter):
-        x_new = x_prev - f(x_prev) * (b - x_prev) / (f(b) - f(x_prev))
+        x_new = next_x(x_prev)
         if abs(x_new - x_prev) < eps and abs(f(x_new)) <= eps:
             return x_new, iter_count + 1, None
-        iter_count += 1
         x_prev = x_new
+        iter_count += 1
+
     return x_prev, iter_count, "Достигнуто максимальное количество итераций"
 
 def newton_method(f, df, x0, eps, a, b, max_iter=1000):
@@ -240,7 +251,7 @@ def main():
         eps = float(input("Введите точность epsilon: "))
 
         if method == '1':
-            root, iters, error = chord_method(eq['f'], a, b, eps)
+            root, iters, error = chord_method(eq['f'], eq['d2f'], a, b, eps)
         elif method == '2':
             x0 = a if abs(eq['f'](a) * eq['d2f'](a)) < abs(eq['f'](b) * eq['d2f'](b)) else b
             root, iters, error = newton_method(eq['f'], eq['df'], x0, eps, a, b)
