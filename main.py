@@ -84,11 +84,23 @@ systems = [
 ]
 
 
+def has_single_root(f, a, b, num_points=100):
+    """Проверка, что на интервале [a, b] только один корень."""
+    xs = np.linspace(a, b, num_points)
+    signs = np.sign([f(x) for x in xs])
+    sign_changes = np.sum(np.diff(signs) != 0)
+    return sign_changes == 1
+
+
 
 
 
 
 def chord_method(f, a, b, eps, max_iter=1000):
+    if not has_single_root(f, a, b):
+        return None, 0, "На интервале возможно более одного корня"
+
+
     if f(a) * f(b) >= 0:
         return None, 0, "Интервал не содержит корня или содержит несколько корней"
     iter_count = 0
@@ -101,7 +113,11 @@ def chord_method(f, a, b, eps, max_iter=1000):
         x_prev = x_new
     return x_prev, iter_count, "Достигнуто максимальное количество итераций"
 
-def newton_method(f, df, x0, eps, max_iter=1000):
+def newton_method(f, df, x0, eps, a, b, max_iter=1000):
+    
+    if not has_single_root(f, a, b):
+        return None, 0, "На интервале возможно более одного корня"
+    
     iter_count = 0
     x_prev = x0
     for _ in range(max_iter):
@@ -119,6 +135,12 @@ def newton_method(f, df, x0, eps, max_iter=1000):
 
 def simple_iteration_method(f, phi, dphi, a, b, eps, max_iter=1000):
     # Проверка условия сходимости |phi'(x)| < 1
+    
+    if not has_single_root(f, a, b):
+        return None, 0, "На интервале возможно более одного корня"
+    
+
+
     x_samples = [a + (b - a) * i / 1000 for i in range(1001)]
     if max(abs(dphi(x)) for x in x_samples) >= 1:
         return None, 0, "Условие сходимости не выполнено"
@@ -158,17 +180,24 @@ def newton_system(F, J, x0, y0, eps, max_iter=100):
         return x_prev, iter_count, errors, "Достигнуто максимальное количество итераций"
     return x_prev, iter_count + 1, errors, None
 
-def plot_equation(f, a, b, root=None):
-    x = np.linspace(a, b, 400)
-    y = [f(xi) for xi in x]
-    plt.plot(x, y, label='f(x)')
-    plt.axhline(0, color='black', linewidth=0.5)
+def plot_equation(f, a, b, root=None, title="График функции"):
+    xs = np.linspace(a, b, 1000)
+    ys = [f(x) for x in xs]
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(xs, ys, label='f(x)', color='blue')
+    plt.axhline(0, color='black', linewidth=0.8)
+    plt.axvline(0, color='black', linewidth=0.8)
+    plt.grid(True, linestyle='--', alpha=0.5)
+
     if root is not None:
-        plt.scatter(root, f(root), color='red', label='Корень')
+        plt.plot(root, f(root), 'ro', label=f'Корень ≈ {root:.5f}')
+
+    plt.title(title)
     plt.xlabel('x')
     plt.ylabel('f(x)')
     plt.legend()
-    plt.grid()
+    plt.tight_layout()
     plt.show()
 
 def plot_system(sys, solution=None):
@@ -214,7 +243,7 @@ def main():
             root, iters, error = chord_method(eq['f'], a, b, eps)
         elif method == '2':
             x0 = a if abs(eq['f'](a) * eq['d2f'](a)) < abs(eq['f'](b) * eq['d2f'](b)) else b
-            root, iters, error = newton_method(eq['f'], eq['df'], x0, eps)
+            root, iters, error = newton_method(eq['f'], eq['df'], x0, eps, a, b)
         elif method == '3':
             # Преобразование к виду x = phi(x)
             lambda_value = -1 / max(abs(eq['df'](a)), abs(eq['df'](b)))
@@ -230,8 +259,9 @@ def main():
         if error:
             print(f"Ошибка: {error}")
         else:
-            print(f"\nКорень: {root:.5f}")
-            print(f"Значение функции: {eq['f'](root):.5f}")
+            fval = eq['f'](root)
+            print(f"\nКорень: {root}")
+            print(f"Значение функции: {fval}")
             print(f"Итераций: {iters}")
             plot_equation(eq['f'], a, b, root)
 
